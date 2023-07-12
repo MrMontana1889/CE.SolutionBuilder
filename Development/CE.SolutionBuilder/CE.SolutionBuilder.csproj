@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="..\..\_Targets\CommonPropertiesAnyCPU.targets" />
+    <ItemGroup>
+      <PackageReference Include="NDepend.Path" Version="2.0.0" />
+    </ItemGroup>
+
+</Project>
