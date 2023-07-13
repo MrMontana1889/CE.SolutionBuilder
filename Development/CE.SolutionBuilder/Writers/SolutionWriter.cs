@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Microsoft.Build.Construction;
 using NDepend.Path;
 
 namespace CE.SolutionBuilder.Writers
@@ -98,12 +99,31 @@ namespace CE.SolutionBuilder.Writers
             var componentRelativePath = componentAsolutePath.GetRelativePathFrom(solutionAsolutePath);
             var relativeProjectFilename = Path.Combine($"{componentRelativePath}", project.ProjectFile);
 
-            string guid = $"{{{project.Guid.ToString().ToUpperInvariant()}}}";
+            var guid = GetProjectGuidFrom(project.ProjectFullPath);
+            if (guid == Guid.Empty)
+                guid = project.Guid;
             if (Path.GetExtension(project.ProjectFile) == ".csproj")
-                writer.WriteLine($"Project(\"{cpsCsProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"{guid}\"");
+                writer.WriteLine($"Project(\"{cpsCsProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"{{{guid.ToString().ToUpperInvariant()}}}\"");
             else if (Path.GetExtension(project.ProjectFile) == ".vcxproj")
-                writer.WriteLine($"Project(\"{vcProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"{guid}\"");
+                writer.WriteLine($"Project(\"{vcProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"(({guid.ToString().ToUpperInvariant()}))\"");
             writer.WriteLine("EndProject");
+        }
+        private Guid GetProjectGuidFrom(string projectPath)
+        {
+            ProjectRootElement project = ProjectRootElement.Open(Path.GetFullPath(projectPath));
+            foreach (var propertyGroup in project.PropertyGroups)
+            {
+                if (propertyGroup.Label == "Globals")
+                {
+                    foreach (var property in propertyGroup.Properties)
+                    {
+                        if (property.ElementName == "ProjectGuid")
+                            return new Guid(property.Value);
+                    }
+                }
+            }
+
+            return Guid.Empty;
         }
         private void WriteGlobalSection(StreamWriter writer, ISolution solution)
         {
@@ -112,7 +132,63 @@ namespace CE.SolutionBuilder.Writers
             WritePreSolutionPlatforms(writer, solution);
             WritePostSolutionPlatforms(writer, solution);
 
+            WritePreSolution(writer);
+
+            writer.WriteLine($"\tGlobalSection(NestedProjects) = preSolution");
+            foreach (var folder in solution.Folders)
+                WriteNestedFolder(writer, folder);
+            foreach (var project in solution.Projects)
+                WriteNestedProject(writer, project);
+            writer.WriteLine($"\tEndGlobalSection");
+
+            WritePostSolution(writer);
+
             writer.WriteLine("EndGlobal");
+        }
+
+        private void WritePostSolution(StreamWriter writer)
+        {
+            //GlobalSection(ExtensibilityGlobals) = postSolution
+            //  SolutionGuid = {F1029B2A-DB0D-464B-BFCC-F124DD4CBDD1}
+            //EndGlobalSection
+            writer.WriteLine("\tGlobalSection(ExtensibilityGlobals) = postSolution");
+            writer.WriteLine("\t\tSolutionGuid = {" + $"{Guid.NewGuid()}" + "}");
+            writer.WriteLine("\tEndGlobalSection");
+        }
+
+        private void WritePreSolution(StreamWriter writer)
+        {
+            //GlobalSection(SolutionProperties) = preSolution
+            //  HideSolutionNode = FALSE
+            //EndGlobalSection
+            writer.WriteLine("\tGlobalSection(SolutionProperties) = preSolution");
+            writer.WriteLine("\t\tHideSolutionNode = FALSE");
+            writer.WriteLine("\tEndGlobalSection");
+        }
+
+        private void WriteNestedFolder(StreamWriter writer, IFolder folder)
+        {
+            if (folder.Guid != Guid.Empty && folder.Parent.Guid != Guid.Empty)
+            {
+                string folderGuid = "{" + $"{folder.Guid}".ToUpperInvariant() + "}";
+                string parent = "{" + $"{folder.Parent.Guid}".ToUpperInvariant() + "}";
+                writer.WriteLine($"\t\t{folderGuid} = {parent}");
+            }
+
+            foreach (var f in folder.Folders)
+                WriteNestedFolder(writer, f);
+            foreach (var p in folder.Projects)
+                WriteNestedProject(writer, p);
+        }
+
+        private void WriteNestedProject(StreamWriter writer, IProject project)
+        {
+            if (project.Guid != Guid.Empty && project.Parent.Guid != Guid.Empty)
+            {
+                string projectGuid = "{" + $"{project.Guid}".ToUpperInvariant() + "}";
+                string folderGuid = "{" + $"{project.Parent.Guid}".ToUpperInvariant() + "}";
+                writer.WriteLine($"\t\t{projectGuid} = {folderGuid}");
+            }
         }
 
         private void WritePreSolutionPlatforms(StreamWriter writer, ISolution solution)
@@ -137,7 +213,19 @@ namespace CE.SolutionBuilder.Writers
 
         private void WriteProjectConfiguration(StreamWriter writer, IProject project, ISolution solution)
         {
+            string guid = $"{{{project.Guid}}}".ToUpperInvariant();
 
+            foreach (var config in project.Configurations)
+            {
+                WritePlatformConfiguration(writer, guid, config.SolutionConfiguration, config, "ActiveCfg");
+
+                if (config.On)
+                    WritePlatformConfiguration(writer, guid, config.SolutionConfiguration, config, "Build.0");
+            }
+        }
+        private void WritePlatformConfiguration(StreamWriter writer, string guid, IConfiguration solution, IProjectConfiguration config, string suffix)
+        {
+            writer.WriteLine($"\t\t{guid}.{solution.Config}|{solution.Platform}.{suffix} = {config.Config}|{config.Platform}");
         }
         #endregion
 
