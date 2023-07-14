@@ -20,6 +20,11 @@ namespace CE.SolutionBuilder.Writers
         public bool Write(string rootPath, ISolution solution)
         {
             RootPath = rootPath;
+
+            string solutionDirectory = Path.GetDirectoryName(solution.FullPath);
+            if (!Directory.Exists(solutionDirectory))
+                Directory.CreateDirectory(solutionDirectory);
+
             using (FileStream fileStream = File.Open(solution.FullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
             {
                 using (StreamWriter writer = new StreamWriter(fileStream, Encoding.Default))
