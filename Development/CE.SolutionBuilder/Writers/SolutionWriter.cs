@@ -10,22 +10,16 @@ using NDepend.Path;
 
 namespace CE.SolutionBuilder.Writers
 {
-    internal class SolutionWriter : ISolutionWriter
+    public class SolutionWriter : ISolutionWriter
     {
-        #region Constructor
-        internal SolutionWriter()
-        {
-
-        }
-        #endregion
-
         #region Static Properties
         public static ISolutionWriter Default => new SolutionWriter();
         #endregion
 
         #region Public Methods
-        public void Write(ISolution solution)
+        public bool Write(string rootPath, ISolution solution)
         {
+            RootPath = rootPath;
             using (FileStream fileStream = File.Open(solution.FullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
             {
                 using (StreamWriter writer = new StreamWriter(fileStream, Encoding.Default))
@@ -35,7 +29,38 @@ namespace CE.SolutionBuilder.Writers
                     WriteGlobalSection(writer, solution);
                 }
             }
+
+            return true;
         }
+        #endregion
+
+        #region Protected Methods
+        protected virtual void WriteProject(StreamWriter writer, IProject project, ISolution solution)
+        {
+            var solutionAsolutePath = Path.GetDirectoryName(solution.FullPath).ToAbsoluteDirectoryPath();
+            Environment.CurrentDirectory = $"{solutionAsolutePath}";
+
+            var componentAsolutePath = Path.GetDirectoryName(project.ProjectFullPath).ToAbsoluteDirectoryPath();
+            var componentRelativePath = componentAsolutePath.GetRelativePathFrom(solutionAsolutePath);
+            var relativeProjectFilename = Path.Combine($"{componentRelativePath}", project.ProjectFile);
+
+            var guid = GetProjectGuidFrom(project.ProjectFullPath);
+            if (guid == Guid.Empty)
+                guid = project.Guid;
+            if (project.Guid != guid)
+                project.Guid = guid;
+            if (Path.GetExtension(project.ProjectFile) == ".csproj")
+                writer.WriteLine($"Project(\"{cpsCsProjectGuid}\") = \"{Path.GetFileNameWithoutExtension(project.ProjectName)}\", \"{relativeProjectFilename}\", \"{{{guid.ToString().ToUpperInvariant()}}}\"");
+            else if (Path.GetExtension(project.ProjectFile) == ".vcxproj")
+                writer.WriteLine($"Project(\"{vcProjectGuid}\") = \"{Path.GetFileNameWithoutExtension(project.ProjectName)}\", \"{relativeProjectFilename}\", \"{{{guid.ToString().ToUpperInvariant()}}}\"");
+            writer.WriteLine("EndProject");
+
+            PlatformProjects.Add(project);
+        }
+        #endregion
+
+        #region Protected Properties
+        protected string RootPath { get; private set; }
         #endregion
 
         #region Private Methods
@@ -47,7 +72,6 @@ namespace CE.SolutionBuilder.Writers
             VisualStudioVersion = 17.6.33815.320
             MinimumVisualStudioVersion = 10.0.40219.1
             */
-            writer.WriteLine("");
             writer.WriteLine("Microsoft Visual Studio Solution File, Format Version 12.00");
             writer.WriteLine("# Visual Studio Version 17");
             writer.WriteLine("VisualStudioVersion = 17.6.33815.320");
@@ -58,19 +82,19 @@ namespace CE.SolutionBuilder.Writers
             if (solution.StartupProject != null)
                 WriteProject(writer, solution.StartupProject, solution);
 
-            foreach (var folder in solution.Folders)
-                WriteFolders(writer, folder, solution);
-
             foreach (var project in solution.Projects)
             {
                 if (project == solution.StartupProject) continue;       // Skip - already written
                 WriteProject(writer, project, solution);
             }
+
+            foreach (var folder in solution.Folders)
+                WriteFolders(writer, folder, solution);
         }
         private void WriteFolders(StreamWriter writer, IFolder folder, ISolution solution)
         {
             WriteFolder(writer, folder);
-            WriteFolders(writer, folder.Folders);
+            WriteFolders(writer, folder.Folders, solution);
 
             foreach (IProject project in folder.Projects)
             {
@@ -78,34 +102,16 @@ namespace CE.SolutionBuilder.Writers
                 WriteProject(writer, project, solution);
             }
         }
-        private void WriteFolders(StreamWriter writer, IReadOnlyList<IFolder> folders)
+        private void WriteFolders(StreamWriter writer, IReadOnlyList<IFolder> folders, ISolution solution)
         {
             foreach (IFolder folder in folders)
-                WriteFolder(writer, folder);
+                WriteFolders(writer, folder, solution);
         }
         private void WriteFolder(StreamWriter writer, IFolder folder)
         {
             string folderGuid = $"{{{folder.Guid.ToString().ToUpperInvariant()}}}";
-            string project = $"Project(\"{solutionFolderGuid}\") = \"{folder.FolderName}\", \"{folderGuid}\"";
+            string project = $"Project(\"{solutionFolderGuid}\") = \"{folder.FolderName}\", \"{folder.FolderName}\", \"{folderGuid}\"";
             writer.WriteLine(project);
-            writer.WriteLine("EndProject");
-        }
-        private void WriteProject(StreamWriter writer, IProject project, ISolution solution)
-        {
-            var solutionAsolutePath = solution.FullPath.ToAbsoluteDirectoryPath();
-            Environment.CurrentDirectory = $"{solutionAsolutePath}";
-
-            var componentAsolutePath = project.ProjectFullPath.ToAbsoluteDirectoryPath();
-            var componentRelativePath = componentAsolutePath.GetRelativePathFrom(solutionAsolutePath);
-            var relativeProjectFilename = Path.Combine($"{componentRelativePath}", project.ProjectFile);
-
-            var guid = GetProjectGuidFrom(project.ProjectFullPath);
-            if (guid == Guid.Empty)
-                guid = project.Guid;
-            if (Path.GetExtension(project.ProjectFile) == ".csproj")
-                writer.WriteLine($"Project(\"{cpsCsProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"{{{guid.ToString().ToUpperInvariant()}}}\"");
-            else if (Path.GetExtension(project.ProjectFile) == ".vcxproj")
-                writer.WriteLine($"Project(\"{vcProjectGuid}\") = \"{project.ProjectName}\", \"{relativeProjectFilename}\", \"(({guid.ToString().ToUpperInvariant()}))\"");
             writer.WriteLine("EndProject");
         }
         private Guid GetProjectGuidFrom(string projectPath)
@@ -134,12 +140,12 @@ namespace CE.SolutionBuilder.Writers
 
             WritePreSolution(writer);
 
-            writer.WriteLine($"\tGlobalSection(NestedProjects) = preSolution");
+            writer.WriteLine("\tGlobalSection(NestedProjects) = preSolution");
             foreach (var folder in solution.Folders)
                 WriteNestedFolder(writer, folder);
             foreach (var project in solution.Projects)
                 WriteNestedProject(writer, project);
-            writer.WriteLine($"\tEndGlobalSection");
+            writer.WriteLine("\tEndGlobalSection");
 
             WritePostSolution(writer);
 
@@ -168,7 +174,7 @@ namespace CE.SolutionBuilder.Writers
 
         private void WriteNestedFolder(StreamWriter writer, IFolder folder)
         {
-            if (folder.Guid != Guid.Empty && folder.Parent.Guid != Guid.Empty)
+            if (folder.Guid != Guid.Empty && (folder != null && folder.Parent.Guid != Guid.Empty))
             {
                 string folderGuid = "{" + $"{folder.Guid}".ToUpperInvariant() + "}";
                 string parent = "{" + $"{folder.Parent.Guid}".ToUpperInvariant() + "}";

@@ -3,10 +3,10 @@
 
 namespace CE.SolutionBuilder
 {
-    internal class ProjectConfiguration : Configuration, IProjectConfiguration
+    public class ProjectConfiguration : Configuration, IProjectConfiguration
     {
         #region Constructor
-        internal ProjectConfiguration(IConfiguration solutionConfiguration,
+        public ProjectConfiguration(IConfiguration solutionConfiguration,
             string config, string platform, bool on = true)
             : base(config, platform)
         {

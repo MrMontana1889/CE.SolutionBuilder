@@ -8,7 +8,8 @@ namespace CE.SolutionBuilder.Writers
         /// <summary>
         /// Writes the solution to a format implemented in Write method.
         /// </summary>
+        /// <param name="rootPath">The root path of where source is located for determining relative paths</param>
         /// <param name="solution">The solution to write</param>
-        void Write(ISolution solution);
+        bool Write(string rootPath, ISolution solution);
     }
 }

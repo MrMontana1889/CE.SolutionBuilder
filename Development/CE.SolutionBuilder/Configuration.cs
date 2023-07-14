@@ -3,13 +3,20 @@
 
 namespace CE.SolutionBuilder
 {
-    internal class Configuration : IConfiguration
+    public class Configuration : IConfiguration
     {
         #region Constructor
         internal Configuration(string config, string platform)
         {
             Config = config;
             Platform = platform;
+        }
+        #endregion
+
+        #region Public Methods
+        public static IConfiguration New(string config, string platform)
+        {
+            return new Configuration(config, platform);
         }
         #endregion
 

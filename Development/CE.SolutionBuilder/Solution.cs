@@ -7,13 +7,18 @@ using CE.SolutionBuilder.Writers;
 
 namespace CE.SolutionBuilder
 {
-    internal class Solution : Folder, ISolution
+    public class Solution : Folder, ISolution
     {
         #region Constructor
-        internal Solution(string fullPath, string name)
+        public Solution(string fullPath, string name)
             : base(null, name)
         {
             FullPath = fullPath;
+
+            AddConfiguration("Debug", "x64");
+            AddConfiguration("Debug", "x86");
+            AddConfiguration("Release", "x64");
+            AddConfiguration("Release", "x86");
         }
         #endregion
 
@@ -44,9 +49,9 @@ namespace CE.SolutionBuilder
 
         public void RemoveConfiguration(string config, string platform) => Configs.RemoveAll(c => c.Config == config && c.Platform == platform);
 
-        public void Save(ISolutionWriter writer)
+        public bool Save(string rootPath, ISolutionWriter writer)
         {
-            writer.Write(this);
+            return writer.Write(rootPath, this);
         }
         public void SetStartupProject(IProject project)
         {

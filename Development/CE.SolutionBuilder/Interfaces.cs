@@ -12,7 +12,7 @@ namespace CE.SolutionBuilder
         /// <summary>
         /// A unique identifier
         /// </summary>
-        Guid Guid { get; }
+        Guid Guid { get; set; }
     }
 
     public interface IConfiguration
@@ -75,6 +75,11 @@ namespace CE.SolutionBuilder
         /// <returns>An instance of the project with the given name and location.</returns>
         IProject AddProject(string projectName, string projectFullPath, bool usePlatforms = false);
         /// <summary>
+        /// Adds a project to the folder.
+        /// </summary>
+        /// <param name="project">The project to add.  Cannot be null.</param>
+        void AddProject(IProject project);
+        /// <summary>
         /// Gets the project from the folder.  Project names must be unique.
         /// </summary>
         /// <param name="projectName"></param>
@@ -111,7 +116,7 @@ namespace CE.SolutionBuilder
         /// A new configuration instance for this configuration.
         /// If the configuration already exists, returns that configuration instance.
         /// </returns>
-        IProjectConfiguration AddConfiguration(IConfiguration solutionConfiguration, string config, string platform);
+        IProjectConfiguration AddConfiguration(IConfiguration solutionConfiguration, string config, string platform, bool on = true);
         /// <summary>
         /// Removes a configuration from the project.
         /// </summary>
@@ -170,7 +175,7 @@ namespace CE.SolutionBuilder
         /// Saves the solution given the writer to use.
         /// </summary>
         /// <param name="writer">The writer to use.</param>
-        void Save(ISolutionWriter writer);
+        bool Save(string rootPath, ISolutionWriter writer);
         /// <summary>
         /// Sets the given project as the startup project if there is no
         /// .vs file present when the solution opens.

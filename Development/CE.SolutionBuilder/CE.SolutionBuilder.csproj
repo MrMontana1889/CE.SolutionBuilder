@@ -1,4 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+      <Platforms>AnyCPU;x64</Platforms>
+    </PropertyGroup>
     <Import Project="..\..\_Targets\CommonPropertiesAnyCPU.targets" />
     <ItemGroup>
         <PackageReference Include="Microsoft.Build" Version="17.6.3" />

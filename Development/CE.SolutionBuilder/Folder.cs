@@ -7,13 +7,18 @@ using System.Linq;
 
 namespace CE.SolutionBuilder
 {
-    internal class Folder : IFolder
+    public class Folder : IFolder
     {
         #region Constructor
-        internal Folder(IFolder parent, string name)
+        public Folder(IFolder parent, string name)
         {
             Parent = parent;
             FolderName = name;
+
+            if (Parent != null)
+                Guid = Guid.NewGuid();
+            else
+                Guid = Guid.Empty;
         }
         #endregion
 
@@ -57,6 +62,12 @@ namespace CE.SolutionBuilder
             }
             return project;
         }
+        public void AddProject(IProject project)
+        {
+            if (project == null) return;
+            if (GetProject(project.ProjectName) == null)
+                Projectz.Add(project);
+        }
         public IProject GetProject(string projectName)
         {
             return Projectz.FirstOrDefault(p => p.ProjectName == projectName);
@@ -64,16 +75,16 @@ namespace CE.SolutionBuilder
         #endregion
 
         #region Public Properties
-        public Guid Guid { get; } = Guid.NewGuid();
+        public Guid Guid { get; set; }
         public string FolderName { get; }
         public IFolder Parent { get; }
         public IReadOnlyList<IFolder> Folders => Folderz.AsReadOnly();
         public IReadOnlyList<IProject> Projects => Projectz.AsReadOnly();
         #endregion
 
-        #region Private Properties
-        private List<IFolder> Folderz { get; } = new List<IFolder>();
-        private List<IProject> Projectz { get; } = new List<IProject>();
+        #region Protected Properties
+        protected List<IFolder> Folderz { get; } = new List<IFolder>();
+        protected List<IProject> Projectz { get; } = new List<IProject>();
         #endregion
     }
 }
