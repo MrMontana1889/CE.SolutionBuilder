@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Evaluation;
+using ShellProgressBar;
 
 namespace CE.SolutionBuilder.Analyzer
 {
@@ -34,33 +35,37 @@ namespace CE.SolutionBuilder.Analyzer
             // For each project found, go through its references and if the assembly's source is found
             // in the map, add the project to the list.
 
-            List<ProjectRootElement> referencedProjects = FindReferencedProjects(filename, assemblyToProject);
-
-            ProjectRootElement projectAnalyzed = ProjectRootElement.Open(filename, ProjectCollection, true);
-            referencedProjects.Insert(0, projectAnalyzed);
-
-            IDictionary<string, ProjectRootElement> uniqueProjectRferences = new Dictionary<string, ProjectRootElement>(referencedProjects.Count);
-            foreach (var referencedProject in referencedProjects)
+            using (var pbar = new ProgressBar(1, "Retrieving referenced projects..."))
             {
-                if (!uniqueProjectRferences.ContainsKey(referencedProject.FullPath))
-                    uniqueProjectRferences.Add(referencedProject.FullPath, referencedProject);
-            }
+                List<ProjectRootElement> referencedProjects = FindReferencedProjects(filename, assemblyToProject, pbar);
+                pbar.Tick();
 
-            foreach (var item in uniqueProjectRferences)
-            {
-                string targetFramework = GetTargetFramework(item.Key);
-                string ext = Path.GetExtension(item.Value.FullPath);
+                ProjectRootElement projectAnalyzed = ProjectRootElement.Open(filename, ProjectCollection, true);
+                referencedProjects.Insert(0, projectAnalyzed);
 
-                solution.AddProject(Path.GetFileName(item.Key), item.Value.FullPath,
-                    !string.IsNullOrEmpty(targetFramework) || ext == ".vcxproj" ||
-                    item.Value.FullPath.Contains(".Test."));
+                IDictionary<string, ProjectRootElement> uniqueProjectRferences = new Dictionary<string, ProjectRootElement>(referencedProjects.Count);
+                foreach (var referencedProject in referencedProjects)
+                {
+                    if (!uniqueProjectRferences.ContainsKey(referencedProject.FullPath))
+                        uniqueProjectRferences.Add(referencedProject.FullPath, referencedProject);
+                }
+
+                foreach (var item in uniqueProjectRferences)
+                {
+                    string targetFramework = GetTargetFramework(item.Key);
+                    string ext = Path.GetExtension(item.Value.FullPath);
+
+                    solution.AddProject(Path.GetFileName(item.Key), item.Value.FullPath,
+                        !string.IsNullOrEmpty(targetFramework) || ext == ".vcxproj" ||
+                        item.Value.FullPath.Contains(".Test."));
+                }
             }
 
             return solution;
         }
 
         #region Private Methods
-        private List<ProjectRootElement> FindReferencedProjects(string filename, IDictionary<string, ProjectRootElement> assemblyToProject)
+        private List<ProjectRootElement> FindReferencedProjects(string filename, IDictionary<string, ProjectRootElement> assemblyToProject, ProgressBar pbar)
         {
             var currentDirectory = Environment.CurrentDirectory;
             try
@@ -112,10 +117,23 @@ namespace CE.SolutionBuilder.Analyzer
                 }
 
                 List<ProjectRootElement> projects = new List<ProjectRootElement>();
-                foreach (var referencedProject in referencedProjects)
+                using (var spawn = pbar.Spawn(referencedProjects.Count, "Retrieving referenced projects...",
+                    new ProgressBarOptions
+                    {
+                        CollapseWhenFinished = true,
+                    }))
                 {
-                    projects.Add(referencedProject);
-                    projects.AddRange(FindReferencedProjects(referencedProject.FullPath, assemblyToProject));
+                    foreach (var referencedProject in referencedProjects)
+                    {
+                        spawn.Tick();
+                        spawn.Message = Path.GetFileNameWithoutExtension(referencedProject.FullPath);
+
+                        if (projects.Find(p => p.FullPath == referencedProject.FullPath) == null)
+                        {
+                            projects.Add(referencedProject);
+                            projects.AddRange(FindReferencedProjects(referencedProject.FullPath, assemblyToProject, pbar));
+                        }
+                    }
                 }
 
                 return projects;
@@ -162,31 +180,54 @@ namespace CE.SolutionBuilder.Analyzer
         {
             IDictionary<string, ProjectRootElement> assemblyToProject = new Dictionary<string, ProjectRootElement>();
 
-            foreach (string folder in searchPaths)
-            {
-                var projects = Directory.GetFiles(folder, "*.csproj", SearchOption.AllDirectories)
-                    .Concat(Directory.GetFiles(folder, "*.vcxproj", SearchOption.AllDirectories));
-                foreach (var projectFile in projects)
+            using (var pbar = new ProgressBar(searchPaths.Length, "Searching for source projects...",
+                new ProgressBarOptions
                 {
-                    if (projectFile.Contains(@"\Bentley."))
-                        continue;
-                    if (projectFile.Contains("Haestad.Arx"))
-                        continue;
-                    if (projectFile.Contains("Shanghai"))
-                        continue;
+                    ForegroundColor = ConsoleColor.Red,
+                    BackgroundColor = ConsoleColor.White,
+                    ForegroundColorDone = ConsoleColor.Blue,
+                }))
+            {
+                foreach (string folder in searchPaths)
+                {
+                    pbar.Tick();
+                    pbar.Message = folder;
 
-                    ProjectRootElement project = null;
-                    try { project = ProjectRootElement.Open(projectFile, ProjectCollection, true); }
-                    catch { }
-                    if (project == null)
-                        continue;
+                    var projects = Directory.GetFiles(folder, "*.csproj", SearchOption.AllDirectories)
+                        .Concat(Directory.GetFiles(folder, "*.vcxproj", SearchOption.AllDirectories)).ToList();
 
-                    var assemblyName = GetAssemblyName(project);
-                    if (assemblyToProject.ContainsKey(assemblyName))
+                    using (var spawn = pbar.Spawn(projects.Count, "Processing projects...",
+                        new ProgressBarOptions
+                        {
+                            ForegroundColor = ConsoleColor.Blue,
+                            BackgroundColor = ConsoleColor.White,
+                            ForegroundColorDone = ConsoleColor.Red,
+                            CollapseWhenFinished = true,
+                        }))
                     {
-                        continue;
+                        foreach (var projectFile in projects)
+                        {
+                            if (projectFile.Contains(@"\Bentley."))
+                                continue;
+                            if (projectFile.Contains("Haestad.Arx"))
+                                continue;
+                            if (projectFile.Contains("Shanghai"))
+                                continue;
+
+                            ProjectRootElement project = null;
+                            try { project = ProjectRootElement.Open(projectFile, ProjectCollection, true); }
+                            catch { }
+                            if (project == null)
+                                continue;
+
+                            var assemblyName = GetAssemblyName(project);
+                            if (assemblyToProject.ContainsKey(assemblyName))
+                            {
+                                continue;
+                            }
+                            assemblyToProject.Add(assemblyName, project);
+                        }
                     }
-                    assemblyToProject.Add(assemblyName, project);
                 }
             }
 

@@ -27,7 +27,7 @@ namespace CE.SolutionBuilder.Writers
 
             using (FileStream fileStream = File.Open(solution.FullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
             {
-                using (StreamWriter writer = new StreamWriter(fileStream, Encoding.Default))
+                using (StreamWriter writer = new StreamWriter(fileStream, Encoding.UTF8))
                 {
                     WriteHeader(writer);
                     WriteProjects(writer, solution);
@@ -124,13 +124,10 @@ namespace CE.SolutionBuilder.Writers
             ProjectRootElement project = ProjectRootElement.Open(Path.GetFullPath(projectPath));
             foreach (var propertyGroup in project.PropertyGroups)
             {
-                if (propertyGroup.Label == "Globals")
+                foreach (var property in propertyGroup.Properties)
                 {
-                    foreach (var property in propertyGroup.Properties)
-                    {
-                        if (property.ElementName == "ProjectGuid")
-                            return new Guid(property.Value);
-                    }
+                    if (property.ElementName == "ProjectGuid")
+                        return new Guid(property.Value);
                 }
             }
 
