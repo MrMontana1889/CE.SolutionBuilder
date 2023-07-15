@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace CE.SolutionBuilder
@@ -53,10 +54,20 @@ namespace CE.SolutionBuilder
                 {
                     project.ResetConfigurations();
 
-                    project.AddConfiguration(new Configuration("Debug", "x64"), "Debug", "x64");
-                    project.AddConfiguration(new Configuration("Debug", "x86"), "Debug", "x86");
-                    project.AddConfiguration(new Configuration("Release", "x64"), "Release", "x64");
-                    project.AddConfiguration(new Configuration("Release", "x86"), "Release", "x86");
+                    if (Path.GetExtension(projectFullPath) == ".csproj")
+                    {
+                        project.AddConfiguration(new Configuration("Debug", "x64"), "Debug", "x64");
+                        project.AddConfiguration(new Configuration("Debug", "x86"), "Debug", "x86");
+                        project.AddConfiguration(new Configuration("Release", "x64"), "Release", "x64");
+                        project.AddConfiguration(new Configuration("Release", "x86"), "Release", "x86");
+                    }
+                    else if (Path.GetExtension(projectFullPath) == ".vcxproj")
+                    {
+                        project.AddConfiguration(new Configuration("Debug", "x64"), "Debug", "x64");
+                        project.AddConfiguration(new Configuration("Debug", "x86"), "Debug", "Win32");
+                        project.AddConfiguration(new Configuration("Release", "x64"), "Release", "x64");
+                        project.AddConfiguration(new Configuration("Release", "x86"), "Release", "Win32");
+                    }
                 }
                 Projectz.Add(project);
             }
