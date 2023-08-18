@@ -1,9 +1,9 @@
 ﻿// Interfaces.cs
 // Copyright (c) 2023 Kris Culin. All Rights Reserved.
 
+using CE.SolutionBuilder.Writers;
 using System;
 using System.Collections.Generic;
-using CE.SolutionBuilder.Writers;
 
 namespace CE.SolutionBuilder
 {
@@ -175,7 +175,7 @@ namespace CE.SolutionBuilder
         /// Saves the solution given the writer to use.
         /// </summary>
         /// <param name="writer">The writer to use.</param>
-        bool Save(string rootPath, ISolutionWriter writer);
+        bool Save(string rootPath, string targetFrameworks, ISolutionWriter writer);
         /// <summary>
         /// Sets the given project as the startup project if there is no
         /// .vs file present when the solution opens.

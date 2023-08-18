@@ -10,6 +10,6 @@ namespace CE.SolutionBuilder.Writers
         /// </summary>
         /// <param name="rootPath">The root path of where source is located for determining relative paths</param>
         /// <param name="solution">The solution to write</param>
-        bool Write(string rootPath, ISolution solution);
+        bool Write(string rootPath, string targetFrameworks, ISolution solution);
     }
 }

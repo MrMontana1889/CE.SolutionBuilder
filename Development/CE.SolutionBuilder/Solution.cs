@@ -1,9 +1,9 @@
 ﻿// Solution.cs
 // Copyright (c) 2023 Kris Culin. All Rights Reserved.
 
+using CE.SolutionBuilder.Writers;
 using System.Collections.Generic;
 using System.Linq;
-using CE.SolutionBuilder.Writers;
 
 namespace CE.SolutionBuilder
 {
@@ -49,9 +49,9 @@ namespace CE.SolutionBuilder
 
         public void RemoveConfiguration(string config, string platform) => Configs.RemoveAll(c => c.Config == config && c.Platform == platform);
 
-        public bool Save(string rootPath, ISolutionWriter writer)
+        public bool Save(string rootPath, string targetFrameworks, ISolutionWriter writer)
         {
-            return writer.Write(rootPath, this);
+            return writer.Write(rootPath, targetFrameworks, this);
         }
         public void SetStartupProject(IProject project)
         {

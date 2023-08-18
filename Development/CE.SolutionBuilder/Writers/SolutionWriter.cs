@@ -1,12 +1,12 @@
 ﻿// SolutionWriter.cs
 // Copyright (c) 2023 Kris Culin. All Rights Reserved.
 
+using Microsoft.Build.Construction;
+using NDepend.Path;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using Microsoft.Build.Construction;
-using NDepend.Path;
 
 namespace CE.SolutionBuilder.Writers
 {
@@ -17,9 +17,10 @@ namespace CE.SolutionBuilder.Writers
         #endregion
 
         #region Public Methods
-        public bool Write(string rootPath, ISolution solution)
+        public bool Write(string rootPath, string targetFrameworks, ISolution solution)
         {
             RootPath = rootPath;
+            TargetFrameworks = targetFrameworks;
 
             string solutionDirectory = Path.GetDirectoryName(solution.FullPath);
             if (!Directory.Exists(solutionDirectory))
@@ -45,6 +46,10 @@ namespace CE.SolutionBuilder.Writers
             var solutionAsolutePath = Path.GetDirectoryName(solution.FullPath).ToAbsoluteDirectoryPath();
             Environment.CurrentDirectory = $"{solutionAsolutePath}";
 
+            if (Path.GetExtension(project.ProjectFullPath) == VCXPROJ &&
+                !TargetFrameworks.Contains(GetTargetFramework(project.ProjectFullPath)))
+                return;
+
             var componentAsolutePath = Path.GetDirectoryName(project.ProjectFullPath).ToAbsoluteDirectoryPath();
             var componentRelativePath = componentAsolutePath.GetRelativePathFrom(solutionAsolutePath);
             var relativeProjectFilename = Path.Combine($"{componentRelativePath}", project.ProjectFile);
@@ -62,10 +67,20 @@ namespace CE.SolutionBuilder.Writers
 
             PlatformProjects.Add(project);
         }
+        protected string GetTargetFramework(string filename)
+        {
+            if (filename.Contains(NET6))
+                return NET6;
+            if (filename.Contains(NET472))
+                return NET472;
+
+            return string.Empty;
+        }
         #endregion
 
         #region Protected Properties
         protected string RootPath { get; private set; }
+        protected string TargetFrameworks { get; private set; }
         #endregion
 
         #region Private Methods
@@ -191,6 +206,10 @@ namespace CE.SolutionBuilder.Writers
 
         private void WriteNestedProject(StreamWriter writer, IProject project)
         {
+            if (Path.GetExtension(project.ProjectFullPath) == VCXPROJ &&
+                !TargetFrameworks.Contains(GetTargetFramework(project.ProjectFullPath)))
+                return;
+
             if (project.Guid != Guid.Empty && project.Parent.Guid != Guid.Empty)
             {
                 string projectGuid = "{" + $"{project.Guid}".ToUpperInvariant() + "}";
@@ -245,6 +264,10 @@ namespace CE.SolutionBuilder.Writers
         private const string solutionFolderGuid = "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
         private const string vcProjectGuid = "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}";
         private const string cpsCsProjectGuid = "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}";
+        protected const string CSPROJ = ".csproj";
+        protected const string VCXPROJ = ".vcxproj";
+        protected const string NET6 = "net6.0-windows";
+        protected const string NET472 = "net472";
         #endregion
     }
 }
